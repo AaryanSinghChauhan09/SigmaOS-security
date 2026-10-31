@@ -21,13 +21,25 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Check out transitive sibling path dependencies
         working-directory: ${{ github.workspace }}/${{ github.event.repository.name }}
+        env:
+          SIGMAOS_REPO_TOKEN: ${{ secrets.SIGMAOS_REPO_TOKEN }}
         run: |
           python3 - <<'PY'
+          import base64
+          import os
           import subprocess
           import tomllib
           from pathlib import Path
 
           component = Path.cwd().resolve()
+          token = os.environ.get("SIGMAOS_REPO_TOKEN")
+          if not token:
+              raise SystemExit("configure SIGMAOS_REPO_TOKEN with read access to private SigmaOS dependencies")
+          clone_env = os.environ.copy()
+          credentials = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+          clone_env["GIT_CONFIG_COUNT"] = "1"
+          clone_env["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader"
+          clone_env["GIT_CONFIG_VALUE_0"] = f"AUTHORIZATION: basic {credentials}"
           pending = [component]
           inspected = set()
           while pending:
@@ -56,6 +68,7 @@ jobs:
                                f"https://github.com/AaryanSinghChauhan09/{repository}.git",
                                str(dependency)],
                               check=True,
+                              env=clone_env,
                           )
                       pending.append(dependency)
           PY

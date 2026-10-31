@@ -12,6 +12,10 @@ categories = ["os"]
 
 [dependencies]
 sigmaos-kernel = { version = "0.1", path = "../SigmaOS-kernel" }
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "password-hash"] }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+getrandom = "0.3"
 
 [profile.release]
 opt-level = 3

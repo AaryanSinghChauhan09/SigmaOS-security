@@ -8,7 +8,7 @@ use crate::klib::HashMap;
 #[cfg(not(target_os = "none"))]
 use std::collections::HashMap;
 
-use crate::security::crypto_utils::{constant_time_eq, hash_password_placeholder, SecureRandom};
+use crate::security::crypto_utils::{hash_password, verify_password, SecureRandom};
 use std::string::{String as AllocString, ToString};
 use std::vec::Vec;
 
@@ -30,8 +30,7 @@ pub enum PamError {
 pub struct PamUser {
     pub uid: u32,
     pub username: AllocString,
-    pub password_hash: [u8; 32],
-    pub salt: [u8; 16],
+    pub password_hash: AllocString,
     pub primary_group: AllocString,
     pub is_locked: bool,
     pub failed_attempts: u32,
@@ -156,8 +155,7 @@ impl SovereignPamManager {
                 let dummy_user = PamUser {
                     uid: 0,
                     username: username.to_string(),
-                    password_hash: [0; 32],
-                    salt: [0; 16],
+                    password_hash: AllocString::new(),
                     primary_group: primary_group.to_string(),
                     is_locked: false,
                     failed_attempts: 0,
@@ -167,13 +165,8 @@ impl SovereignPamManager {
         }
 
         let mut rng = SecureRandom::new();
-        let mut salt_buf = Vec::with_capacity(16);
-        salt_buf.resize(16, 0u8);
-        rng.fill_bytes(&mut salt_buf)
-            .map_err(|_| PamError::AuthenticationFailed)?;
-        let salt: [u8; 16] = salt_buf.try_into().unwrap_or_else(|_| [0u8; 16]);
-
-        let hash = hash_password_placeholder(user_token, &salt);
+        let password_hash =
+            hash_password(user_token, &mut rng).map_err(|_| PamError::AuthenticationFailed)?;
 
         let uid = self.next_uid;
         self.next_uid += 1;
@@ -181,8 +174,7 @@ impl SovereignPamManager {
         let user = PamUser {
             uid,
             username: username.to_string(),
-            password_hash: hash,
-            salt,
+            password_hash,
             primary_group: primary_group.to_string(),
             is_locked: false,
             failed_attempts: 0,
@@ -252,17 +244,9 @@ impl SovereignPamManager {
         let user = match self.users.get_mut(username) {
             Some(u) => u,
             None => {
-                // Timing side-channel mitigation: Perform dummy token hashing
-                // to match computation time of existing user lookup (CWE-208 / CWE-385)
-                let mut entropy_bytes = Vec::with_capacity(16);
-                let name_bytes = username.as_bytes();
-                let fill_len = name_bytes.len().min(16);
-                entropy_bytes.extend_from_slice(&name_bytes[..fill_len]);
-                entropy_bytes.resize(16, 0u8);
-                let entropy_arr: [u8; 16] = entropy_bytes.try_into().unwrap_or([0u8; 16]);
-                let dummy_hash = hash_password_placeholder(user_token, &entropy_arr);
-                let zero_cmp = [0u8; 32];
-                let _ = constant_time_eq(&dummy_hash, &zero_cmp);
+                // Perform a dummy Argon2 hash to reduce username enumeration timing differences.
+                let mut rng = SecureRandom::new();
+                let _ = hash_password(user_token, &mut rng);
                 return Err(PamError::UserNotFound);
             }
         };
@@ -273,8 +257,7 @@ impl SovereignPamManager {
         }
 
         // Verify the salted password hash
-        let expected_hash = hash_password_placeholder(user_token, &user.salt);
-        if constant_time_eq(&user.password_hash, &expected_hash) {
+        if verify_password(user_token, &user.password_hash) {
             // Success! Reset failed attempts
             user.failed_attempts = 0;
             Ok(())

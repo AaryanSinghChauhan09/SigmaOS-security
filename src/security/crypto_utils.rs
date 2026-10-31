@@ -1,7 +1,6 @@
 //! Cryptographic Utilities for SigmaOS
 //!
-//! This module provides secure random number generation and cryptographic utilities.
-//! In production, these should use hardware RNG or properly vetted cryptographic libraries.
+//! This module uses the operating system entropy source and RustCrypto Argon2.
 
 use std::vec;
 use std::vec::Vec;
@@ -12,38 +11,31 @@ pub enum CryptoError {
     RandomGenerationFailed,
     InvalidKeyLength,
     InvalidNonce,
+    PasswordHashFailed,
 }
 
-/// Simple cryptographic random number generator
-///
-/// WARNING: This is a basic implementation for development/testing purposes.
-/// In production, use hardware RNG (RDRAND/ARM) or a vetted CSPRNG (e.g. ChaCha20/AES-CTR).
-pub struct SecureRandom {
-    seed: u64,
-}
+/// Access to the platform's cryptographic random number source.
+pub struct SecureRandom;
 
 impl SecureRandom {
     pub fn new() -> Self {
-        const DEFAULT_PRNG_SEED: u64 = 0x5a5a5a5a5a5a5a5a;
-        #[cfg(not(target_os = "none"))]
-        let initial_seed: u64 = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(DEFAULT_PRNG_SEED as u128) as u64;
-
-        #[cfg(target_os = "none")]
-        let initial_seed: u64 = DEFAULT_PRNG_SEED;
-
-        Self { seed: initial_seed }
+        Self
     }
 
-    /// Fill a buffer with random bytes using a Linear Congruential Generator.
+    /// Fill a buffer from the system entropy source.
+    ///
+    /// Freestanding targets fail closed until SigmaOS supplies a platform RNG.
     pub fn fill_bytes(&mut self, buffer: &mut [u8]) -> Result<(), CryptoError> {
-        for byte in buffer.iter_mut() {
-            self.seed = self.seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-            *byte = (self.seed >> 32) as u8;
+        #[cfg(not(target_os = "none"))]
+        {
+            getrandom::fill(buffer).map_err(|_| CryptoError::RandomGenerationFailed)
         }
-        Ok(())
+
+        #[cfg(target_os = "none")]
+        {
+            let _ = buffer;
+            Err(CryptoError::RandomGenerationFailed)
+        }
     }
 
     /// Generate a random key of specified length
@@ -101,25 +93,28 @@ pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     core::hint::black_box(result) == 0
 }
 
-/// Password hashing placeholder using zero-allocation iterator cycles
-pub fn hash_password_placeholder(password: &str, salt: &[u8; 16]) -> [u8; 32] {
-    let mut hash = [0u8; 32];
-    let password_bytes = password.as_bytes();
+/// Create a PHC-encoded Argon2id password hash with a fresh 16-byte salt.
+pub fn hash_password(password: &str, rng: &mut SecureRandom) -> Result<String, CryptoError> {
+    use argon2::password_hash::PasswordHasher;
 
-    if password_bytes.is_empty() {
-        return hash;
-    }
+    let mut salt_bytes = [0u8; 16];
+    rng.fill_bytes(&mut salt_bytes)?;
+    argon2::Argon2::default()
+        .hash_password_with_salt(password.as_bytes(), &salt_bytes)
+        .map(|hash| hash.to_string())
+        .map_err(|_| CryptoError::PasswordHashFailed)
+}
 
-    let mut pwd_cycle = password_bytes.iter().cycle();
-    let mut salt_cycle = salt.iter().cycle();
+/// Verify a password against its PHC-encoded Argon2id hash.
+pub fn verify_password(password: &str, encoded_hash: &str) -> bool {
+    use argon2::password_hash::{phc::PasswordHash, PasswordVerifier};
 
-    for h_byte in hash.iter_mut() {
-        if let (Some(&p_b), Some(&s_b)) = (pwd_cycle.next(), salt_cycle.next()) {
-            *h_byte = p_b ^ s_b;
-        }
-    }
-
-    hash
+    let Ok(parsed_hash) = PasswordHash::new(encoded_hash) else {
+        return false;
+    };
+    argon2::Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok()
 }
 
 #[cfg(test)]
