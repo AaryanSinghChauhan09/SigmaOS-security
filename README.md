@@ -2,12 +2,6 @@
 
 Part of the SigmaOS multi-repository architecture.
 
-## Principles
-- MODULARITY: Single responsibility per repository
-- LOOSE COUPLING: Minimal dependencies between repos
-- INTERFACE SEGREGATION: Clear, focused public APIs
-- DETERMINISTIC TESTING: Comprehensive test coverage
-
 ## Password and entropy boundaries
 
 PAM stores Argon2id hashes in PHC string format with a fresh 16-byte salt from
