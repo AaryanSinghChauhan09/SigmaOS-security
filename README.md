@@ -1,25 +1,40 @@
 # SigmaOS-security
 
-Part of the SigmaOS multi-repository architecture.
+SigmaOS component inspired by Arch Linux and Debian architecture.
 
-## Password and entropy boundaries
+## Overview
 
-PAM stores Argon2id hashes in PHC string format with a fresh 16-byte salt from
-the host operating system's entropy source. Password verification uses the
-parameters encoded with each hash. On `target_os = "none"`, entropy requests
-return an error until a SigmaOS platform RNG is connected; the code never falls
-back to a predictable seed.
+This component provides essential functionality for the SigmaOS operating system,
+following the modular design principles of Arch Linux and the stability focus of Debian.
 
-The `PamUser.password_hash` field now contains the encoded PHC string instead
-of a fixed 32-byte placeholder hash. Existing in-memory user records must be
-recreated; there is no persisted account store in this component.
+## Features
 
-GitHub Actions checks out the private `SigmaOS-kernel` path dependency. Configure
-the repository secret `SIGMAOS_REPO_TOKEN` with read access to that repository
-for the Rust validation workflow to run.
+- Modular architecture
+- Minimal dependencies
+- Well-documented APIs
+- Comprehensive testing
+
+## Building
+
+```bash
+cargo build --release
+```
+
+## Testing
+
+```bash
+cargo test
+```
 
 ## License
-SPDX-License-Identifier: GPL-3.0-or-later
 
-## Copyright
-Copyright (C) 2026 SigmaOS Project
+MIT License - See LICENSE file for details.
+
+## Contributing
+
+See CONTRIBUTING.md for guidelines.
+
+## Links
+
+- Repository: https://github.com/AaryanSinghChauhan09/SigmaOS-security
+- SigmaOS: https://github.com/AaryanSinghChauhan09
