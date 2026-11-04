@@ -1,42 +1,40 @@
 use crate::config::Config;
-use crate::error::Result;
-use log::{info, error};
+use crate::error::{ComponentError, Result};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ServiceStatus {
+    Stopped,
+    Running,
+    Failed(String),
+}
 
 pub struct Service {
     config: Config,
-    running: bool,
+    status: ServiceStatus,
 }
 
 impl Service {
     pub fn new(config: Config) -> Self {
-        Service {
-            config,
-            running: false,
-        }
+        Self { config, status: ServiceStatus::Stopped }
     }
 
     pub fn start(&mut self) -> Result<()> {
-        if self.running {
-            error!("Service already running");
-            return Err(crate::error::ComponentError::RuntimeError("Service already running".to_string()).into());
+        if self.status == ServiceStatus::Running {
+            return Err(ComponentError::Service("already running".to_string()));
         }
-        info!("Starting service");
-        self.config.process()?;
-        self.running = true;
+        self.status = ServiceStatus::Running;
         Ok(())
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        if !self.running {
-            error!("Service not running");
-            return Err(crate::error::ComponentError::RuntimeError("Service not running".to_string()).into());
+        if self.status == ServiceStatus::Stopped {
+            return Err(ComponentError::Service("not running".to_string()));
         }
-        info!("Stopping service");
-        self.running = false;
+        self.status = ServiceStatus::Stopped;
         Ok(())
     }
 
-    pub fn is_running(&self) -> bool {
-        self.running
-    }
+    pub fn is_running(&self) -> bool { self.status == ServiceStatus::Running }
+    pub fn status(&self) -> &ServiceStatus { &self.status }
+    pub fn config(&self) -> &Config { &self.config }
 }

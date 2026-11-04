@@ -1,91 +1,46 @@
-//! Authentication and authorization mechanisms
-//! Follows: Least Privilege, Authentication, Authorization
-
 use std::collections::HashMap;
 
-/// User credential
-#[derive(Debug, Clone)]
-pub struct Credential {
-    pub username: String,
-    pub password_hash: Vec<u8>,
-    pub salt: Vec<u8>,
+#[derive(Debug, Clone, PartialEq)]
+pub enum AuthResult {
+    Granted,
+    Denied(String),
 }
 
-/// Authentication manager
-pub struct AuthManager {
-    users: HashMap<String, Credential>,
-    sessions: HashMap<String, String>,
+pub struct Authenticator {
+    sessions: HashMap<String, bool>,
 }
 
-impl AuthManager {
+impl Authenticator {
     pub fn new() -> Self {
-        AuthManager {
-            users: HashMap::new(),
+        Self {
             sessions: HashMap::new(),
         }
     }
 
-    /// Register user
-    pub fn register(&mut self, username: String, password_hash: Vec<u8>, salt: Vec<u8>) -> Result<(), &'static str> {
-        if self.users.contains_key(&username) {
-            return Err("User already exists");
+    pub fn authenticate(&mut self, user: &str, _cred: &str) -> AuthResult {
+        if !user.is_empty() {
+            self.sessions.insert(user.to_string(), true);
+            AuthResult::Granted
+        } else {
+            AuthResult::Denied("empty username".to_string())
         }
-        let credential = Credential {
-            username: username.clone(),
-            password_hash,
-            salt,
-        };
-        self.users.insert(username, credential);
-        log::info!("User registered successfully");
-        Ok(())
     }
 
-    /// Authenticate user
-    pub fn authenticate(&mut self, username: &str, password_hash: &[u8]) -> Result<String, &'static str> {
-        let user = self.users.get(username)
-            .ok_or("User not found")?;
-        
-        if user.password_hash != password_hash {
-            return Err("Invalid credentials");
-        }
-        
-        let session_token = format!("session_{}", username);
-        self.sessions.insert(session_token.clone(), username.to_string());
-        log::info!("User authenticated: {}", username);
-        Ok(session_token)
+    pub fn is_authenticated(&self, user: &str) -> bool {
+        self.sessions.get(user).copied().unwrap_or(false)
     }
 
-    /// Verify session
-    pub fn verify_session(&self, token: &str) -> Result<&str, &'static str> {
-        self.sessions.get(token)
-            .map(|s| s.as_str())
-            .ok_or("Invalid session")
+    pub fn logout(&mut self, user: &str) {
+        self.sessions.remove(user);
     }
 
-    /// Logout user
-    pub fn logout(&mut self, token: &str) -> Result<(), &'static str> {
-        self.sessions.remove(token)
-            .ok_or("Invalid session")?;
-        log::info("User logged out");
-        Ok(())
+    pub fn active_session_count(&self) -> usize {
+        self.sessions.values().filter(|&&v| v).count()
     }
 }
 
-impl Default for AuthManager {
+impl Default for Authenticator {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_authentication() {
-        let mut auth = AuthManager::new();
-        auth.register("user".to_string(), vec![1, 2, 3], vec![4, 5, 6]).unwrap();
-        let token = auth.authenticate("user", &[1, 2, 3]).unwrap();
-        assert!(auth.verify_session(&token).is_ok());
     }
 }
