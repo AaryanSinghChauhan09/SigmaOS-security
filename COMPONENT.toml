@@ -1,8 +1,16 @@
 [component]
 name = "SigmaOS-security"
-version = "0.1.0"
-maturity = "alpha"
-tier = 2
-owner = "SigmaOS Team"
-purpose = "Authentication, authorization, cryptographic primitives, and security audit"
-dependencies = []
+tier = 1
+stability = "scaffold"
+language = "rust"
+description = "Operating system security substrate, vulnerability auditor, and CVE compliance checker"
+upstream = ["https://github.com/canonical/ubuntu-security-notices"]
+
+[contract]
+provides = ["security-substrate", "cve-auditor", "vulnerability-scanner"]
+depends_on = []
+
+[maturity]
+status = "Scaffold"
+test_evidence = "Compiles and passes AAA unit tests"
+next_milestone = "Hardware and runtime integration"

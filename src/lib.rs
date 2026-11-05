@@ -1,48 +1,35 @@
-pub mod auth;
-pub mod config;
-pub mod error;
-pub mod service;
-
-pub use auth::{AuthResult, Authenticator};
-pub use config::Config;
-pub use error::{ComponentError, Result};
-pub use service::{Service, ServiceStatus};
-
-pub trait Component {
-    fn name(&self) -> &str;
-    fn version(&self) -> &str;
-    fn initialize(&mut self) -> error::Result<()>;
-    fn shutdown(&mut self) -> error::Result<()>;
-    fn health_check(&self) -> error::Result<()>;
+#[derive(Debug, Clone)]
+pub struct SecurityVulnerability {
+    pub cve_id: String,
+    pub affected_package: String,
+    pub cvss_score: f32,
 }
 
-pub struct SecurityComponent {
-    service: service::Service,
+#[derive(Debug, Default)]
+pub struct SecurityAuditor {
+    known_cves: Vec<SecurityVulnerability>,
 }
 
-impl SecurityComponent {
-    pub fn new(config: Config) -> Self {
-        Self { service: service::Service::new(config) }
+impl SecurityAuditor {
+    pub fn new() -> Self { Self::default() }
+    pub fn register_cve(&mut self, cve: SecurityVulnerability) { self.known_cves.push(cve); }
+    pub fn audit_package(&self, pkg: &str) -> Vec<&SecurityVulnerability> {
+        self.known_cves.iter().filter(|c| c.affected_package == pkg).collect()
     }
 }
 
-impl Component for SecurityComponent {
-    fn name(&self) -> &str { "sigmaos-security" }
-    fn version(&self) -> &str { env!("CARGO_PKG_VERSION") }
-
-    fn initialize(&mut self) -> error::Result<()> {
-        self.service.start()
-    }
-
-    fn shutdown(&mut self) -> error::Result<()> {
-        self.service.stop()
-    }
-
-    fn health_check(&self) -> error::Result<()> {
-        if self.service.is_running() {
-            Ok(())
-        } else {
-            Err(error::ComponentError::Service("security service not running".to_string()))
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_security_audit_package() {
+        let mut auditor = SecurityAuditor::new();
+        auditor.register_cve(SecurityVulnerability {
+            cve_id: "CVE-2026-1105".into(),
+            affected_package: "openssl".into(),
+            cvss_score: 8.5,
+        });
+        assert_eq!(auditor.audit_package("openssl").len(), 1);
+        assert_eq!(auditor.audit_package("rustc").len(), 0);
     }
 }
