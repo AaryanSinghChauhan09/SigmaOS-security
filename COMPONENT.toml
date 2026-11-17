@@ -3,12 +3,12 @@ name = "SigmaOS-security"
 tier = 1
 stability = "scaffold"
 language = "rust"
-description = "Operating system security substrate, vulnerability auditor, and CVE compliance checker"
+description = "Privilege separation, LSM hooks, secure defaults"
 upstream = ["https://github.com/canonical/ubuntu-security-notices"]
 
 [contract]
 provides = ["security-substrate", "cve-auditor", "vulnerability-scanner"]
-depends_on = []
+depends_on = ["SigmaOS-kernel"]
 
 [maturity]
 status = "Scaffold"
