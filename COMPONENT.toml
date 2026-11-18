@@ -1,16 +1,16 @@
 [component]
 name = "SigmaOS-security"
 tier = 1
-stability = "scaffold"
+stability = "beta"
 language = "rust"
-description = "Privilege separation, LSM hooks, secure defaults"
+description = "Privilege separation, mandatory access control (MAC) policy engine, and CVE vulnerability auditor"
 upstream = ["https://github.com/canonical/ubuntu-security-notices"]
 
 [contract]
-provides = ["security-substrate", "cve-auditor", "vulnerability-scanner"]
+provides = ["security-substrate", "cve-auditor", "vulnerability-scanner", "mac-policy-engine"]
 depends_on = ["SigmaOS-kernel"]
 
 [maturity]
-status = "Scaffold"
-test_evidence = "Compiles and passes AAA unit tests"
+status = "Implemented"
+test_evidence = "Compiles and passes 10 unit and integration tests"
 next_milestone = "Hardware and runtime integration"
