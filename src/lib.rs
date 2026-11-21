@@ -423,3 +423,6 @@ mod tests {
         assert!(root.has_cap(Capability::SysAdmin));
     }
 }
+
+/// Module extracted from the SigmaOS-system monolith.
+pub mod sigmaprivilegemanager;
